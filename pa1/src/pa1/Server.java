@@ -14,6 +14,7 @@ public class Server {
             System.err.print("Not enough arguments supplied to server object.");
             System.exit(1);
         }
+        ServerThreadMonitor monitor = new ServerThreadMonitor();
         try {
             String action = args[1];
             if (action.equals("start")) {
@@ -21,7 +22,8 @@ public class Server {
                 ServerSocket welcomeSocket = new ServerSocket(portNum);
                 while (true) {
                     Socket clientConnection = welcomeSocket.accept();
-                    new ServerThread(clientConnection, args).start();
+                    monitor.startNewThread();
+                    new ServerThread(clientConnection, monitor).start();
                 }
             } else {
                 System.err.print("Invalid argument passed to server object.");
