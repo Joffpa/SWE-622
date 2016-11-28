@@ -2,11 +2,6 @@ package pa1;
 
 import java.net.*;
 import java.io.*;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.NoSuchFileException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 
 /**
  *
@@ -43,7 +38,6 @@ public class ServerThread extends Thread {
                     DoDownloadToClient(relativeDir);
                     break;
                 case "dir":
-                    //Thread.sleep(5000);
                     relativeDir = inFromClientReader.readLine();
                     SendFileInfo(relativeDir);
                     break;
@@ -71,8 +65,6 @@ public class ServerThread extends Thread {
                     System.exit(1);
                     break;
             }
-//        } catch (InterruptedException ) {
-//            System.err.println("Invalid command sent from client");
         } catch (IndexOutOfBoundsException e) {
             System.err.println("Invalid command sent from client");
         } catch (IOException e) {
@@ -89,19 +81,24 @@ public class ServerThread extends Thread {
 
     private void DoDownloadToClient(String filepath) throws IOException {
         System.out.println("Downloading file: " + filepath);
+        if (!filepath.startsWith("\\")) {
+            filepath = "\\" + filepath;
+        }
         String fullPath = GetBaseDir() + filepath;
         File file = new File(fullPath);
-        FileInputStream fileStream = new FileInputStream(file);
+        System.out.println(fullPath);
         long totalBytesToSend = 0;
         if (!file.exists()) {
             //3
             WriteString("File does not exist on server.");
+            return;
         } else {
             totalBytesToSend = file.length();
             if (totalBytesToSend <= 0) {
                 System.err.print("The specified file was not found on the client.");
                 //3
                 WriteString("File does not exist on server.");
+                return;
             } else {
                 //3
                 WriteString(Enums.Confirmed.msg());
@@ -109,6 +106,8 @@ public class ServerThread extends Thread {
                 WriteString(Long.toString(totalBytesToSend));
             }
         }
+
+        FileInputStream fileStream = new FileInputStream(file);
         //5
         int bytesToSkip = Integer.valueOf(inFromClientReader.readLine());
         if (bytesToSkip > 0) {
@@ -128,11 +127,14 @@ public class ServerThread extends Thread {
                 throw new IOException();
             }
         }
+        outToClient.write(new byte[1]);
+        outToClient.flush();
         //8 confirm dl done
         response = inFromClientReader.readLine();
         if (response.equals(Enums.Confirmed.msg())) {
             System.out.println("File downloaded.");
         }
+        fileStream.close();
     }
 
     private void DoUploadToServer(String filepath) throws IOException {
@@ -140,6 +142,7 @@ public class ServerThread extends Thread {
         filepath = FormatFilename(filepath);
         String fullPath = GetBaseDir() + filepath;
         File file = new File(fullPath);
+        file.getParentFile().mkdirs();
         WriteString(Enums.Confirmed.msg());
         int bytesToSkip = Integer.valueOf(inFromClientReader.readLine());
         FileOutputStream fileOut = new FileOutputStream(file, bytesToSkip > 0);
@@ -147,12 +150,7 @@ public class ServerThread extends Thread {
         InputStream inFromClient = clientConnection.getInputStream();
         int bytesRead;
         int totalBytesRead = 0;
-//        int counter = 10;
         do {
-//            counter--;
-//            if (counter == 0) {
-//                throw new IOException();
-//            }
             bytesRead = inFromClient.read(fileBytes);
             WriteString(Enums.Confirmed.msg());
             if (bytesRead != -1) {
@@ -162,6 +160,7 @@ public class ServerThread extends Thread {
         } while (bytesRead != -1 && bytesRead >= BYTE_LENGTH);
         System.out.println("Uploading complete");
         WriteString(Enums.Confirmed.msg());
+        fileOut.close();
     }
 
     private String GetBaseDir() {

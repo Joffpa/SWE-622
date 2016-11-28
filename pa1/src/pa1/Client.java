@@ -130,6 +130,7 @@ public class Client {
         boolean downloadComplete = false;
         long bytesRecieved = 0;
         long totalBytesToDownload = 0;
+        FileOutputStream fileOut = null;
         try {
             pathOnServer = GetArg(2);
             pathToSave = GetArg(3);
@@ -161,17 +162,12 @@ public class Client {
             //5
             WriteString(Long.toString(bytesRecieved));
 
-            FileOutputStream fileOut = new FileOutputStream(file, bytesRecieved > 0);
+            fileOut = new FileOutputStream(file, bytesRecieved > 0);
             InputStream inFromServerRaw = socket.getInputStream();
             byte[] fileBytes = new byte[BYTE_LENGTH];
             int bytesRead;
             int percentComplete = 0;
-            int counter = 10;
             do {
-                counter--;
-                if (counter == 0) {
-                    throw new IOException();
-                }
                 //6 start download
                 bytesRead = inFromServerRaw.read(fileBytes);
                 //7 confirm dl
@@ -191,6 +187,7 @@ public class Client {
             RemovePartialDownloadFromLog(pathOnServer, fullpathToSave);
             downloadComplete = true;
             System.out.println("File downloaded.");
+            fileOut.close();
         } catch (IOException e) {
             if (!downloadComplete) {
                 RemovePartialDownloadFromLog(pathOnServer, fullpathToSave);
@@ -199,7 +196,6 @@ public class Client {
             System.err.println("There was a connection error while trying to connect to the server.");
             System.exit(5);
         }
-
     }
 
     private void DoUpload() {
@@ -246,7 +242,8 @@ public class Client {
                     fileStream.skip(bytesSent);
                 }
                 WriteString(Long.toString(bytesSent));
-                while ((readResult = fileStream.read(fileBytes, 0, BYTE_LENGTH)) != -1) {
+                while ((readResult = fileStream.read(fileBytes, 0, BYTE_LENGTH)) != -1 && totalBytesToSend > bytesSent) {
+                    System.out.println(readResult);
                     outToServer.write(fileBytes, 0, readResult);
                     outToServer.flush();
                     response = inFromServer.readLine();
@@ -260,11 +257,14 @@ public class Client {
                     }
                     System.out.println("Uploading File : " + percentComplete + "%");
                 }
+                outToServer.write(new byte[1]);
+                outToServer.flush();
             } else {
                 System.err.print("There was an error uploading the file to the server. ");
                 System.exit(2);
             }
             response = inFromServer.readLine();
+            System.out.println(response);
             if (response.equals(Enums.Confirmed.msg())) {
                 RemovePartialUploadFromLog(fullpath, pathToSaveOnServer);
                 uploadComplete = true;
