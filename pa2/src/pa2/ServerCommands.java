@@ -12,5 +12,6 @@ public interface ServerCommands extends Remote {
     public boolean rm(String relativePath) throws RemoteException;    
     public boolean shutdown() throws RemoteException;    
     public long getFileSize(String relativePath) throws RemoteException; 
-    public ArrayList<Byte> getFileBytes(String relativePath, int offset, int bytesize) throws RemoteException; 
+    public byte[] getFileBytes(String relativePath, int offset, int bytesize) throws RemoteException;    
+    public long sendFileBytes(byte[] bytes, String relativePath, boolean append) throws RemoteException; 
 }

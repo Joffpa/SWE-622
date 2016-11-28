@@ -2,19 +2,31 @@ package pa2;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 public class Server implements ServerCommands {
 
     public Server() {
         super();
+    }
+
+    @Override
+    public long sendFileBytes(byte[] bytes, String relativePath, boolean append) {
+        try {
+            String fullPath = GetFullFilePath(relativePath);
+            File file = new File(fullPath);
+            FileOutputStream fileStream = new FileOutputStream(file, append);
+            fileStream.write(bytes);
+            return file.length();
+        } catch (IOException e) {
+            System.err.println("Server exception on upload");
+            System.exit(2);
+        }
+        return 0L;
     }
 
     @Override
@@ -30,7 +42,7 @@ public class Server implements ServerCommands {
     }
 
     @Override
-    public ArrayList<Byte> getFileBytes(String relativePath, int offset, int bytesize) {
+    public byte[] getFileBytes(String relativePath, int offset, int bytesize) {
         try {
             String fullPath = GetFullFilePath(relativePath);
             File file = new File(fullPath);
@@ -41,20 +53,15 @@ public class Server implements ServerCommands {
                 }
                 byte[] fileBytes = new byte[bytesize];
                 int readResult = fileStream.read(fileBytes, 0, bytesize);
-
                 if (readResult > -1) {
-                    ArrayList<Byte> bytes = new ArrayList<>();
-                    for (byte b : fileBytes) {
-                        bytes.add(b);
-                    }
-                    return bytes;
+                    return fileBytes;
                 }
             }
         } catch (IOException ex) {
-            Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
-        } finally {
-            return null;
+            System.err.println("Server exception on download");
+            System.exit(2);
         }
+        return null;
     }
 
     @Override
@@ -92,6 +99,8 @@ public class Server implements ServerCommands {
         try {
             return folder.exists() && folder.delete();
         } catch (Exception e) {
+            System.err.println("Server exception on rmdir");
+            System.exit(2);
             return false;
         }
     }
@@ -110,6 +119,8 @@ public class Server implements ServerCommands {
                 return true;
             }
         } catch (Exception e) {
+            System.err.println("Server exception on mkdir");
+            System.exit(2);
             return false;
         }
     }
@@ -186,6 +197,7 @@ public class Server implements ServerCommands {
         } catch (Exception e) {
             System.err.println("Server exception:");
             e.printStackTrace();
+            System.exit(2);
         }
     }
 }

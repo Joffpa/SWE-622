@@ -6,6 +6,7 @@
 package pa2;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -17,7 +18,7 @@ import java.util.ArrayList;
 
 public class Client {
 
-    private static final int BYTE_LENGTH = 1;
+    private static final int BYTE_LENGTH = 1024;
 
     public static void main(String args[]) {
 //        if (System.getSecurityManager() == null) {
@@ -33,6 +34,7 @@ public class Client {
 
             switch (command.trim()) {
                 case "upload":
+                    DoUpload(args, server);
                     break;
                 case "download":
                     DoDownload(args, server);
@@ -94,6 +96,52 @@ public class Client {
         }
     }
 
+    private static void DoUpload(String[] args, ServerCommands server) {
+
+        try {
+            String relativePathOnServer = GetArg(args, 2);
+            long fileLengthOnServer = server.getFileSize(relativePathOnServer);
+            byte[] bytes = new byte[BYTE_LENGTH];
+            String relativePathOnClient = GetArg(args, 1);
+            String fullpath = GetFullPath(relativePathOnClient);
+            File file = new File(fullpath);
+            FileInputStream fileStream = new FileInputStream(file);
+            int counter = 0;
+            if (file.exists()) {
+                long fileLengthOnClient = file.length();
+                fileStream.skip(fileLengthOnServer);
+                while (fileLengthOnServer < fileLengthOnClient && counter < 100) {
+                    System.out.println(fileLengthOnServer);
+                    int readResult = fileStream.read(bytes, 0, BYTE_LENGTH);
+                    if (readResult > -1) {
+                        fileLengthOnServer = server.sendFileBytes(bytes, relativePathOnServer, fileLengthOnServer > 0);
+                    } else {
+                        fileLengthOnServer = server.getFileSize(relativePathOnServer);
+                    }
+                    int percentComplete = (int) (((double) fileLengthOnServer / fileLengthOnClient) * 100);
+                    if (percentComplete > 100) {
+                        percentComplete = 100;
+                    }
+                    System.out.println("Uplaoding File : " + percentComplete + "%");
+                    counter++;
+                }
+            } else {
+                System.err.println("The specified file to upload does not exist.");
+                System.exit(5);
+            }
+
+        } catch (FileNotFoundException e) {
+            System.err.println("There was an error trying to find the file specified");
+            System.exit(5);
+        } catch (RemoteException e) {
+            System.err.println("There was an error trying to connect to the server.");
+            System.exit(2);
+        } catch (IOException e) {
+            System.err.println("There was an error handling the file.");
+            System.exit(5);
+        }
+    }
+
     private static void DoDownload(String[] args, ServerCommands server) {
         try {
             String relativePathOnServer = GetArg(args, 1);
@@ -102,27 +150,20 @@ public class Client {
                 String relativePathOnClient = GetArg(args, 2);
                 String fullpath = GetFullPath(relativePathOnClient);
                 File file = new File(fullpath);
-            System.out.println(fullpath);
                 FileOutputStream fileOut;
                 if (file.exists()) {
                     fileOut = new FileOutputStream(file, true);
                 } else {
                     fileOut = new FileOutputStream(file, false);
                 }
-               
+
                 boolean fileIncomplete = true;
                 while (fileIncomplete) {
                     long bytesAlreadyInFile = file.length();
-                    ArrayList<Byte> bytesToAppend = server.getFileBytes(relativePathOnServer, (int) bytesAlreadyInFile, BYTE_LENGTH);
+                    byte[] bytesToAppend = server.getFileBytes(relativePathOnServer, (int) bytesAlreadyInFile, BYTE_LENGTH);
                     if (bytesToAppend != null) {
-                        System.out.println("Its Not Null");
-                        byte[] byteArray = new byte[BYTE_LENGTH];
-                        for(int i = 0; i < BYTE_LENGTH && i < bytesToAppend.size(); i ++){
-                            byteArray[i] = bytesToAppend.get(i);
-                        }
-                        fileOut.write(byteArray);
+                        fileOut.write(bytesToAppend);
                     } else {
-                        System.out.println("Its Null");
                         fileIncomplete = false;
                     }
                     int percentComplete = (int) (((double) file.length() / fileLength) * 100);
@@ -163,11 +204,12 @@ public class Client {
 
     private static String GetFullPath(String relativePath) {
         if (!"\\".equals(relativePath)) {
-            if (relativePath.startsWith("\\")) {
+            relativePath = relativePath.replace("/", "\\");
+            while (relativePath.startsWith("\\")) {
                 relativePath = relativePath.substring(1);
             }
         }
-        return GetBaseDir() + relativePath;
+        return GetBaseDir() + "\\" + relativePath;
     }
 
     private static String GetBaseDir() {
